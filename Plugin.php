@@ -121,27 +121,26 @@ class VOID_Plugin implements Typecho_Plugin_Interface
         // 创建表，保存点赞与投票相关信息
         $table_name = $prefix . 'votes';
         if (!self::hasTable($table_name)) {
-            $sql = 'create table IF NOT EXISTS `' . $table_name . '` (
-                `vid` int unsigned auto_increment,
-                `id` int unsigned not null,
-                `table` char(32) not null,
-                `type` char(32) not null,
-                `agent` text,
-                `ip` varchar(128),
-                `created` int unsigned default 0,
-                primary key (`vid`)
-            ) default charset=utf8;
-            CREATE INDEX index_ip ON ' . $table_name . '(`ip`);
-            CREATE INDEX index_id ON ' . $table_name . '(`id`);
-            CREATE INDEX index_table ON ' . $table_name . '(`table`)';
-
-            $sqls = explode(';', $sql);
-            foreach ($sqls as $sql) {
-                self::queryAndCatch($sql);
-            }
+            $sql = 'CREATE TABLE IF NOT EXISTS `' . $table_name . '` (
+                `vid` INTEGER PRIMARY KEY AUTOINCREMENT,
+                `id` INTEGER NOT NULL,
+                `table` TEXT NOT NULL,
+                `type` TEXT NOT NULL,
+                `agent` TEXT,
+                `ip` TEXT,
+                `created` INTEGER DEFAULT 0
+            );';
+            self::queryAndCatch($sql);
+        
+            // Create indexes as separate statements
+            self::queryAndCatch('CREATE INDEX IF NOT EXISTS index_ip ON ' . $table_name . '(`ip`);');
+            self::queryAndCatch('CREATE INDEX IF NOT EXISTS index_id ON ' . $table_name . '(`id`);');
+            self::queryAndCatch('CREATE INDEX IF NOT EXISTS index_table ON ' . $table_name . '(`table`);');
+        
         } else {
             if (!self::hasColumn($prefix . 'votes', 'created')) {
-                self::queryAndCatch('ALTER TABLE `' . $prefix . 'votes` ADD COLUMN `created` INT(10) DEFAULT 0;');
+                // SQLite has limited ALTER TABLE support, can only add columns
+                self::queryAndCatch('ALTER TABLE `' . $prefix . 'votes` ADD COLUMN `created` INTEGER DEFAULT 0;');
             }
         }
 
