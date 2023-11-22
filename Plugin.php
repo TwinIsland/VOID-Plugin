@@ -17,19 +17,33 @@ class VOID_Plugin implements Typecho_Plugin_Interface
 {
     public static $VERSION = 1.2;
 
-    private static function hasColumn($table, $field) {
+    private static function hasColumn($table, $field)
+    {
         $db = Typecho_Db::get();
-        $sql = "SHOW COLUMNS FROM `".$table."` LIKE '%".$field."%'";
+        // Use PRAGMA table_info() to get details about the table
+        $sql = "PRAGMA table_info(`" . $table . "`)";
+        $result = $db->fetchAll($sql);
+
+        // Search for the field in the result
+        foreach ($result as $column) {
+            if ($column['name'] === $field) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function hasTable($table)
+    {
+        $db = Typecho_Db::get();
+        // Query sqlite_master table to check for the table existence
+        $sql = "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%" . $table . "%'";
         return count($db->fetchAll($sql)) != 0;
     }
 
-    private static function hasTable($table) {
-        $db = Typecho_Db::get();
-        $sql = "SHOW TABLES LIKE '%".$table."%'";
-        return count($db->fetchAll($sql)) != 0;
-    }
-
-    private static function queryAndCatch($sql) {
+    private static function queryAndCatch($sql)
+    {
         $db = Typecho_Db::get();
         try {
             $db->query($sql);
@@ -52,7 +66,7 @@ class VOID_Plugin implements Typecho_Plugin_Interface
         $prefix = $db->getPrefix();
         $adapterName =  strtolower($db->getAdapterName());
         if (strpos($adapterName, 'mysql') < 0) {
-            throw new Typecho_Plugin_Exception('启用失败，本插件暂时只支持 MySQL 数据库，您的数据库是：'.$adapterName);
+            throw new Typecho_Plugin_Exception('启用失败，本插件暂时只支持 MySQL 数据库，您的数据库是：' . $adapterName);
         }
 
         // 检查是否存在对应扩展
@@ -62,11 +76,11 @@ class VOID_Plugin implements Typecho_Plugin_Interface
 
         /** 图片附件尺寸解析，注册 hook */
         Typecho_Plugin::factory('Widget_Upload')->upload = array('VOID_Plugin', 'upload');
-        
+
         /** 字数统计 */
         // contents 表中若无 wordCount 字段则添加
-        if (!self::hasColumn($prefix.'contents', 'wordCount')) {
-            self::queryAndCatch('ALTER TABLE `'. $prefix .'contents` ADD COLUMN `wordCount` INT(10) DEFAULT 0;');
+        if (!self::hasColumn($prefix . 'contents', 'wordCount')) {
+            self::queryAndCatch('ALTER TABLE `' . $prefix . 'contents` ADD COLUMN `wordCount` INT(10) DEFAULT 0;');
         }
         // 更新一次字数统计
         VOID_WordCount::updateAllWordCount();
@@ -78,25 +92,25 @@ class VOID_Plugin implements Typecho_Plugin_Interface
 
         /** 文章点赞 */
         // 创建字段
-        if (!self::hasColumn($prefix.'contents', 'likes')) {
-            self::queryAndCatch('ALTER TABLE `'. $prefix .'contents` ADD COLUMN `likes` INT(10) DEFAULT 0;');
+        if (!self::hasColumn($prefix . 'contents', 'likes')) {
+            self::queryAndCatch('ALTER TABLE `' . $prefix . 'contents` ADD COLUMN `likes` INT(10) DEFAULT 0;');
         }
         // 加入查询
         Typecho_Plugin::factory('Widget_Archive')->___likes = array('VOID_Plugin', 'likes');
-        
+
         /** 评论赞踩 */
         // 创建字段
-        if (!self::hasColumn($prefix.'comments', 'likes')) {
-            self::queryAndCatch('ALTER TABLE `'. $prefix .'comments` ADD COLUMN `likes` INT(10) DEFAULT 0;');
+        if (!self::hasColumn($prefix . 'comments', 'likes')) {
+            self::queryAndCatch('ALTER TABLE `' . $prefix . 'comments` ADD COLUMN `likes` INT(10) DEFAULT 0;');
         }
-        if (!self::hasColumn($prefix.'comments', 'dislikes')) {
-            self::queryAndCatch('ALTER TABLE `'. $prefix .'comments` ADD COLUMN `dislikes` INT(10) DEFAULT 0;');
+        if (!self::hasColumn($prefix . 'comments', 'dislikes')) {
+            self::queryAndCatch('ALTER TABLE `' . $prefix . 'comments` ADD COLUMN `dislikes` INT(10) DEFAULT 0;');
         }
 
         /** 浏览量统计 */
         // 创建字段
-        if (!self::hasColumn($prefix.'contents', 'viewsNum')) {
-            self::queryAndCatch('ALTER TABLE `'. $prefix .'contents` ADD COLUMN `viewsNum` INT(10) DEFAULT 0;');
+        if (!self::hasColumn($prefix . 'contents', 'viewsNum')) {
+            self::queryAndCatch('ALTER TABLE `' . $prefix . 'contents` ADD COLUMN `viewsNum` INT(10) DEFAULT 0;');
         }
         //增加浏览数
         Typecho_Plugin::factory('Widget_Archive')->beforeRender = array('VOID_Plugin', 'updateViewCount');
@@ -107,7 +121,7 @@ class VOID_Plugin implements Typecho_Plugin_Interface
         // 创建表，保存点赞与投票相关信息
         $table_name = $prefix . 'votes';
         if (!self::hasTable($table_name)) {
-            $sql = 'create table IF NOT EXISTS `'.$table_name.'` (
+            $sql = 'create table IF NOT EXISTS `' . $table_name . '` (
                 `vid` int unsigned auto_increment,
                 `id` int unsigned not null,
                 `table` char(32) not null,
@@ -117,17 +131,17 @@ class VOID_Plugin implements Typecho_Plugin_Interface
                 `created` int unsigned default 0,
                 primary key (`vid`)
             ) default charset=utf8;
-            CREATE INDEX index_ip ON '.$table_name.'(`ip`);
-            CREATE INDEX index_id ON '.$table_name.'(`id`);
-            CREATE INDEX index_table ON '.$table_name.'(`table`)';
+            CREATE INDEX index_ip ON ' . $table_name . '(`ip`);
+            CREATE INDEX index_id ON ' . $table_name . '(`id`);
+            CREATE INDEX index_table ON ' . $table_name . '(`table`)';
 
             $sqls = explode(';', $sql);
             foreach ($sqls as $sql) {
                 self::queryAndCatch($sql);
             }
         } else {
-            if (!self::hasColumn($prefix.'votes', 'created')) {
-                self::queryAndCatch('ALTER TABLE `'. $prefix .'votes` ADD COLUMN `created` INT(10) DEFAULT 0;');
+            if (!self::hasColumn($prefix . 'votes', 'created')) {
+                self::queryAndCatch('ALTER TABLE `' . $prefix . 'votes` ADD COLUMN `created` INT(10) DEFAULT 0;');
             }
         }
 
@@ -150,12 +164,12 @@ class VOID_Plugin implements Typecho_Plugin_Interface
      * @throws Typecho_Plugin_Exception
      */
     public static function deactivate()
-	{
+    {
         Helper::removeAction('void');
         Helper::removeAction('void_vote');
         Helper::removePanel(3, 'VOID/pages/showActivity.php');
     }
-    
+
     /**
      * 获取插件配置面板
      * 
@@ -166,11 +180,16 @@ class VOID_Plugin implements Typecho_Plugin_Interface
     public static function config(Typecho_Widget_Helper_Form $form)
     {
         // 可设置每次获取图片基础信息数量上限
-        $parseImgLimit = new Typecho_Widget_Helper_Form_Element_Text('parseImgLimit', NULL, '10', _t('单次图片处理数量上限'), 
-            _t('这里是每次获取图片基础信息的数量上限。不建议设置过大的数值，太大可能导致处理超时。'));
+        $parseImgLimit = new Typecho_Widget_Helper_Form_Element_Text(
+            'parseImgLimit',
+            NULL,
+            '10',
+            _t('单次图片处理数量上限'),
+            _t('这里是每次获取图片基础信息的数量上限。不建议设置过大的数值，太大可能导致处理超时。')
+        );
         $form->addInput($parseImgLimit);
     }
-    
+
     /**
      * 个人用户的配置面板
      * 
@@ -178,7 +197,9 @@ class VOID_Plugin implements Typecho_Plugin_Interface
      * @param Typecho_Widget_Helper_Form $form
      * @return void
      */
-    public static function personalConfig(Typecho_Widget_Helper_Form $form){}
+    public static function personalConfig(Typecho_Widget_Helper_Form $form)
+    {
+    }
 
     /**
      * 返回文章字数
@@ -235,22 +256,23 @@ class VOID_Plugin implements Typecho_Plugin_Interface
      * @param Widget_Archive   $archive
      * @return void
      */
-    public static function updateViewCount($archive) {
-        if($archive->is('single')){
+    public static function updateViewCount($archive)
+    {
+        if ($archive->is('single')) {
             $cid = $archive->cid;
             $views = Typecho_Cookie::get('__void_post_views');
-            if(empty($views)){
+            if (empty($views)) {
                 $views = array();
             } else {
                 $views = explode(',', $views);
             }
-            if(!in_array($cid,$views)){
+            if (!in_array($cid, $views)) {
                 $db = Typecho_Db::get();
                 $row = $db->fetchRow($db->select('viewsNum')
                     ->from('table.contents')
                     ->where('cid = ?', $cid));
                 $db->query($db->update('table.contents')
-                    ->rows(array('viewsNum' => (int)$row['viewsNum']+1))
+                    ->rows(array('viewsNum' => (int)$row['viewsNum'] + 1))
                     ->where('cid = ?', $cid));
                 array_push($views, $cid);
                 $views = implode(',', $views);
@@ -270,10 +292,10 @@ class VOID_Plugin implements Typecho_Plugin_Interface
     {
         // 若是图片，则增加后缀
         if ($uploadObj->attachment->isImage) {
-            $meta = getimagesize(__TYPECHO_ROOT_DIR__.$uploadObj->attachment->path);
+            $meta = getimagesize(__TYPECHO_ROOT_DIR__ . $uploadObj->attachment->path);
             if ($meta != false) {
-                $uploadObj->attachment->url = 
-                    $uploadObj->attachment->url.'#vwid='.$meta[0].'&vhei='.$meta[1];
+                $uploadObj->attachment->url =
+                    $uploadObj->attachment->url . '#vwid=' . $meta[0] . '&vhei=' . $meta[1];
             }
         }
     }
